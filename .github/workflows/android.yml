@@ -79,12 +79,14 @@ jobs:
           mkdir out
 
       - name: Build Release .apk
+        if: env.GPLAY_KEYSTORE_PASSWORD != ''
         run: |
           # Build the launcher
           gradle :app_pojavlauncher:assembleRelease
           mv app_pojavlauncher/build/outputs/apk/release/app_pojavlauncher-release.apk out/app-release.apk
 
       - name: Gen md5sums
+        if: env.GPLAY_KEYSTORE_PASSWORD != ''
         run: |
           md5sum out/app-release.apk > out/app-release.md5
 
@@ -105,6 +107,7 @@ jobs:
           path: out/app-debug.*
 
       - name: Upload release APK
+        if: env.GPLAY_KEYSTORE_PASSWORD != ''
         uses: actions/upload-artifact@v4
         with:
           name: app-release
