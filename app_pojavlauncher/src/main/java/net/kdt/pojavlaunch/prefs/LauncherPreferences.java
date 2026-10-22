@@ -162,6 +162,8 @@ public class LauncherPreferences {
 
         if (deviceRam < 3064) return 936;
         if (deviceRam < 4096) return 1144;
+        // One UI leaves enough headroom on the 6GB/8GB variants for modern versions
+        if (isExynos1380Device()) return deviceRam < 7168 ? 2048 : 2560;
         if (deviceRam < 6144) return 1536;
         return 2048; //Default RAM allocation for 64 bits
     }
@@ -174,6 +176,8 @@ public class LauncherPreferences {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int minSide = Math.min(metrics.widthPixels, metrics.heightPixels);
         int targetSide = isDevicePowerful ? 1080 : 720;
+        // The Mali-G68 MP5 can't hold a steady framerate at native 1080p, 810p (75%) can
+        if (isExynos1380Device()) targetSide = 810;
         if (minSide <= targetSide) return 100; // No need to scale down
 
         float ratio = (100f * targetSide / minSide);
@@ -192,6 +196,13 @@ public class LauncherPreferences {
         if (Runtime.getRuntime().availableProcessors() <= 4) return false;
         if (hasAllCoreSameFreq()) return false;
         return true;
+    }
+
+    /// Check if the device is a Samsung Galaxy A35 5G (SM-A356*) or another Exynos 1380 (s5e8835) device.
+    /// These have a Mali-G68 MP5 GPU, 6/8GB of RAM and a 1080x2340 120Hz panel.
+    public static boolean isExynos1380Device() {
+        if (Build.MODEL != null && Build.MODEL.startsWith("SM-A356")) return true;
+        return SDK_INT >= Build.VERSION_CODES.S && "s5e8835".equalsIgnoreCase(Build.SOC_MODEL);
     }
 
     private static boolean hasAllCoreSameFreq() {
