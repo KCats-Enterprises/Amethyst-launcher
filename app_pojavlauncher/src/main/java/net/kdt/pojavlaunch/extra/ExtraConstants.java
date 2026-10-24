@@ -19,6 +19,8 @@ public class ExtraConstants {
     public static final String REFRESH_VERSION_SPINNER = "refresh_version";
     /* ExtraCore Constant: When we want to launch the game */
     public static final String LAUNCH_GAME = "launch_game";
+    /* ExtraCore Constant: The optimized profile got installed and selected, as its profile key */
+    public static final String OPTIMIZED_PROFILE_READY = "optimized_profile_ready";
 
 
 

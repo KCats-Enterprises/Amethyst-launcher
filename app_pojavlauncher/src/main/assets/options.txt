@@ -5,6 +5,16 @@ gamma:0.5070422
 saturation:0.0
 renderDistance:6
 simulationDistance:5
+graphicsMode:0
+renderClouds:"fast"
+entityShadows:false
+biomeBlendRadius:1
+entityDistanceScaling:0.75
+menuBackgroundBlurriness:0
+prioritizeChunkUpdates:0
+onboardAccessibility:false
+skipMultiplayerWarning:true
+tutorialStep:none
 guiScale:3
 particles:1
 bobView:false
@@ -14,7 +24,7 @@ maxFps:60
 fboEnable:true
 difficulty:2
 fancyGraphics:false
-ao:0
+ao:false
 clouds:fast
 resourcePacks:[]
 lastServer:

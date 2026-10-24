@@ -28,6 +28,7 @@ import net.kdt.pojavlaunch.R;
 import net.kdt.pojavlaunch.Tools;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
+import net.kdt.pojavlaunch.extra.ExtraListener;
 import net.kdt.pojavlaunch.modloaders.LWJGL3ifyUtils;
 import net.kdt.pojavlaunch.prefs.LauncherPreferences;
 import net.kdt.pojavlaunch.progresskeeper.ProgressKeeper;
@@ -41,6 +42,10 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    private final ExtraListener<String> mOptimizedProfileListener = (key, profileKey) -> {
+        runOnUiThread(this::refreshProfiles);
+        return false;
+    };
 
     public MainMenuFragment(){
         super(R.layout.fragment_launcher);
@@ -115,7 +120,22 @@ public class MainMenuFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        refreshProfiles();
+        ExtraCore.addExtraListener(ExtraConstants.OPTIMIZED_PROFILE_READY, mOptimizedProfileListener);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.OPTIMIZED_PROFILE_READY, mOptimizedProfileListener);
+    }
+
+    /// Reload the profiles, keeping the spinner on the selected one in case it changed in the background
+    private void refreshProfiles() {
+        if (mVersionSpinner == null) return;
         mVersionSpinner.reloadProfiles();
+        String currentProfile = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, "");
+        mVersionSpinner.setSelection(Math.max(0, mVersionSpinner.getProfileAdapter().resolveProfileIndex(currentProfile)));
     }
 
     private void runInstallerWithConfirmation(boolean isCustomArgs) {
