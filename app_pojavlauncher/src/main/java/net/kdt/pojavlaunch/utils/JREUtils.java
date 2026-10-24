@@ -372,6 +372,15 @@ public class JREUtils {
         //Add automatically generated args
         userArgs.add("-Xms" + LauncherPreferences.PREF_RAM_ALLOCATION + "M");
         userArgs.add("-Xmx" + LauncherPreferences.PREF_RAM_ALLOCATION + "M");
+        // The stock G1 settings stall the game for long GC pauses on the A35, use the official launcher's
+        if (LauncherPreferences.isExynos1380Device()) {
+            boolean userPickedGc = false;
+            for (String arg : userArgs) {
+                if (arg.startsWith("-XX:+Use") && arg.endsWith("GC")) userPickedGc = true;
+            }
+            if (!userPickedGc) userArgs.addAll(Arrays.asList("-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC",
+                    "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"));
+        }
         if(LOCAL_RENDERER != null) userArgs.add("-Dorg.lwjgl.opengl.libname=" + graphicsLib);
 
         // Force LWJGL to use the Freetype library intended for it, instead of using the one
