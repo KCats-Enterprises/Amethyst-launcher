@@ -29,9 +29,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,6 +55,10 @@ public class OptimizedProfileInstaller {
     private static final String[] CORE_MODS = {"fabric-api", "appleskin", "shulkerboxtooltip", "lithium", "ferrite-core"};
     // Added when they have a build for the picked Minecraft version
     private static final String[] EXTRA_MODS = {"modernfix", "entityculling", "modmenu", "cloth-config"};
+    // Faster chunk lighting and generation, for the stutter when moving into new chunks.
+    // Added after the first profiles were made, so they get downloaded into existing ones once
+    private static final String[] CHUNK_MODS = {"scalablelux", "noisium"};
+    private static final String PREF_KEY_CHUNK_MODS = "optimizedProfileChunkMods";
     // Shipped in earlier builds but broke the game (Dynamic FPS gave a black screen), deleted on launch
     private static final String[] REMOVED_MODS = {"dynamic-fps", "dynamic_fps", "dynamicfps"};
     // How many of the newest releases to try before giving up
@@ -62,13 +69,15 @@ public class OptimizedProfileInstaller {
     public static void installIfNeeded(Context context, @Nullable JMinecraftVersionList versionList) {
         removeBrokenMods();
         if (versionList == null || versionList.versions == null) return;
-        if (LauncherPreferences.DEFAULT_PREF.getBoolean(PREF_KEY_INSTALLED, false)) return;
+        boolean installed = LauncherPreferences.DEFAULT_PREF.getBoolean(PREF_KEY_INSTALLED, false);
+        if (installed && LauncherPreferences.DEFAULT_PREF.getBoolean(PREF_KEY_CHUNK_MODS, false)) return;
         if (!Tools.isOnline(context)) return;
         if (!sInstalling.compareAndSet(false, true)) return;
 
         ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK, 0, R.string.global_waiting);
         try {
-            if (!install(context, versionList)) Log.w(TAG, "No release has builds of all the core mods");
+            if (installed) addChunkMods();
+            else if (!install(context, versionList)) Log.w(TAG, "No release has builds of all the core mods");
         } catch (Exception e) {
             Log.e(TAG, "Failed to set up the optimized profile", e);
             Tools.showErrorRemote(context, R.string.modpack_install_download_failed, e);
@@ -91,6 +100,26 @@ public class OptimizedProfileInstaller {
                 break;
             }
         }
+    }
+
+    /// Download the chunk mods into a profile made before they were added, keeping the other mods
+    private static void addChunkMods() throws IOException {
+        String gameVersion = null;
+        LauncherProfiles.load();
+        for (MinecraftProfile profile : LauncherProfiles.mainProfileJson.profiles.values()) {
+            if (!(Tools.LAUNCHERPROFILES_RTPREFIX + INSTANCE_PATH).equals(profile.gameDir) || profile.lastVersionId == null) continue;
+            // Fabric version ids end with the game version: fabric-loader-<loader>-<game>
+            gameVersion = profile.lastVersionId.substring(profile.lastVersionId.lastIndexOf('-') + 1);
+        }
+        if (gameVersion != null) {
+            ModDownloader modDownloader = new ModDownloader(new File(Tools.DIR_GAME_HOME, INSTANCE_PATH));
+            for (String slug : CHUNK_MODS) {
+                JsonObject modVersion = findOptionalModVersion(slug, gameVersion);
+                if (modVersion != null) submitModDownload(modDownloader, modVersion);
+            }
+            modDownloader.awaitFinish(new DownloaderProgressWrapper(R.string.modpack_download_downloading_mods, ProgressLayout.INSTALL_MODPACK));
+        }
+        LauncherPreferences.DEFAULT_PREF.edit().putBoolean(PREF_KEY_CHUNK_MODS, true).apply();
     }
 
     private static boolean install(Context context, JMinecraftVersionList versionList) throws IOException {
@@ -122,8 +151,10 @@ public class OptimizedProfileInstaller {
             if (modVersion == null) return null;
             mods.put(modVersion.get("project_id").getAsString(), modVersion);
         }
-        for (String slug : EXTRA_MODS) {
-            JsonObject modVersion = findModVersion(slug, gameVersion);
+        List<String> extraMods = new ArrayList<>(Arrays.asList(EXTRA_MODS));
+        extraMods.addAll(Arrays.asList(CHUNK_MODS));
+        for (String slug : extraMods) {
+            JsonObject modVersion = findOptionalModVersion(slug, gameVersion);
             if (modVersion != null) mods.put(modVersion.get("project_id").getAsString(), modVersion);
         }
 
@@ -161,6 +192,17 @@ public class OptimizedProfileInstaller {
         return versions.get(0).getAsJsonObject();
     }
 
+    /// Like findModVersion, but a mod that is missing or fails to resolve is just skipped
+    @Nullable
+    private static JsonObject findOptionalModVersion(String project, String gameVersion) {
+        try {
+            return findModVersion(project, gameVersion);
+        } catch (IOException e) {
+            Log.w(TAG, "Skipping optional mod " + project, e);
+            return null;
+        }
+    }
+
     private static void createProfile(Context context, String gameVersion, Map<String, JsonObject> mods) throws IOException {
         String loaderVersion = null;
         FabricVersion[] loaderVersions = FabriclikeUtils.FABRIC_UTILS.downloadLoaderVersions(gameVersion);
@@ -188,14 +230,7 @@ public class OptimizedProfileInstaller {
                 oldMod.delete();
         }
         ModDownloader modDownloader = new ModDownloader(instanceDir);
-        for (JsonObject modVersion : mods.values()) {
-            JsonObject file = getPrimaryFile(modVersion);
-            JsonObject hashes = file.getAsJsonObject("hashes");
-            modDownloader.submitDownload(file.get("size").getAsInt(),
-                    "mods/" + file.get("filename").getAsString(),
-                    hashes == null ? null : GsonJsonUtils.getStringSafe(hashes, "sha1"),
-                    file.get("url").getAsString());
-        }
+        for (JsonObject modVersion : mods.values()) submitModDownload(modDownloader, modVersion);
         modDownloader.awaitFinish(new DownloaderProgressWrapper(R.string.modpack_download_downloading_mods, ProgressLayout.INSTALL_MODPACK));
         Tools.copyAssetFile(context, "options.txt", instanceDir.getAbsolutePath(), false);
 
@@ -217,8 +252,18 @@ public class OptimizedProfileInstaller {
         LauncherPreferences.DEFAULT_PREF.edit()
                 .putString(LauncherPreferences.PREF_KEY_CURRENT_PROFILE, profileKey)
                 .putBoolean(PREF_KEY_INSTALLED, true)
+                .putBoolean(PREF_KEY_CHUNK_MODS, true)
                 .apply();
         ExtraCore.setValue(ExtraConstants.OPTIMIZED_PROFILE_READY, profileKey);
+    }
+
+    private static void submitModDownload(ModDownloader modDownloader, JsonObject modVersion) {
+        JsonObject file = getPrimaryFile(modVersion);
+        JsonObject hashes = file.getAsJsonObject("hashes");
+        modDownloader.submitDownload(file.get("size").getAsInt(),
+                "mods/" + file.get("filename").getAsString(),
+                hashes == null ? null : GsonJsonUtils.getStringSafe(hashes, "sha1"),
+                file.get("url").getAsString());
     }
 
     private static JsonObject getPrimaryFile(JsonObject modVersion) {
