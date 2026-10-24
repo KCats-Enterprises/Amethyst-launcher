@@ -47,13 +47,16 @@ public class OptimizedProfileInstaller {
     // Every one of these needs a build for the picked Minecraft version
     private static final String[] CORE_MODS = {"fabric-api", "appleskin", "shulkerboxtooltip", "lithium", "ferrite-core"};
     // Added when they have a build for the picked Minecraft version
-    private static final String[] EXTRA_MODS = {"modernfix", "entityculling", "dynamic-fps", "modmenu"};
+    private static final String[] EXTRA_MODS = {"modernfix", "entityculling", "modmenu"};
+    // Shipped in earlier builds but broke the game (Dynamic FPS gave a black screen), deleted on launch
+    private static final String[] REMOVED_MODS = {"dynamic-fps", "dynamic_fps", "dynamicfps"};
     // How many of the newest releases to try before giving up
     private static final int MAX_CANDIDATES = 10;
     // The launcher activity can get recreated while we are still installing
     private static final AtomicBoolean sInstalling = new AtomicBoolean(false);
 
     public static void installIfNeeded(Context context, @Nullable JMinecraftVersionList versionList) {
+        removeBrokenMods();
         if (versionList == null || versionList.versions == null) return;
         if (LauncherPreferences.DEFAULT_PREF.getBoolean(PREF_KEY_INSTALLED, false)) return;
         if (!Tools.isOnline(context)) return;
@@ -68,6 +71,21 @@ public class OptimizedProfileInstaller {
         } finally {
             ProgressLayout.clearProgress(ProgressLayout.INSTALL_MODPACK);
             sInstalling.set(false);
+        }
+    }
+
+    private static void removeBrokenMods() {
+        File[] mods = new File(Tools.DIR_GAME_HOME, INSTANCE_PATH + "/mods").listFiles();
+        if (mods == null) return;
+        for (File mod : mods) {
+            String name = mod.getName().toLowerCase();
+            for (String removedMod : REMOVED_MODS) {
+                if (!name.contains(removedMod)) continue;
+                Log.i(TAG, "Removing " + mod.getName());
+                //noinspection ResultOfMethodCallIgnored
+                mod.delete();
+                break;
+            }
         }
     }
 

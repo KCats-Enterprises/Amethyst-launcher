@@ -1271,6 +1271,8 @@ public class GLFW
         GLFWWindowProperties win = internalGetWindow(window);
         win.windowAttribs.put(GLFW_HOVERED, 1);
         win.windowAttribs.put(GLFW_VISIBLE, 1);
+        // The game is the only thing on screen, mods like Dynamic FPS throttle it if it isn't focused
+        win.windowAttribs.put(GLFW_FOCUSED, 1);
         nglfwSetShowingWindow(window);
     }
 
@@ -1278,6 +1280,7 @@ public class GLFW
         GLFWWindowProperties win = internalGetWindow(window);
         win.windowAttribs.put(GLFW_HOVERED, 0);
         win.windowAttribs.put(GLFW_VISIBLE, 0);
+        win.windowAttribs.put(GLFW_FOCUSED, 0);
     }
 
     public static void glfwFocusWindow(@NativeType("GLFWwindow *") long window) {
