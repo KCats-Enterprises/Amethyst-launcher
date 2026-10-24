@@ -2,7 +2,7 @@
   "profiles": {
     "(Default)": {
       "name": "(Default)",
-      "lastVersionId": "latest-release"
+      "lastVersionId": "1.21.11"
     }
   },
   "selectedProfile": "(Default)"

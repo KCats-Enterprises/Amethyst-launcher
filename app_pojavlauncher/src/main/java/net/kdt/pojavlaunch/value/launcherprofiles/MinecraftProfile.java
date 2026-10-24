@@ -6,6 +6,8 @@ import androidx.annotation.Keep;
 public class MinecraftProfile {
 
 	public static String LATEST_RELEASE = "latest-release";
+	// Newer releases (26.x) don't start on Amethyst yet, see OptimizedProfileInstaller
+	public static final String NEWEST_SUPPORTED_RELEASE = "1.21.11";
 	public static String LATEST_SNAPSHOT= "latest-snapshot";
 
 	public String name;
@@ -28,14 +30,14 @@ public class MinecraftProfile {
 	public static MinecraftProfile createTemplate(){
 		MinecraftProfile TEMPLATE = new MinecraftProfile();
 		TEMPLATE.name = "";
-		TEMPLATE.lastVersionId = LATEST_RELEASE;
+		TEMPLATE.lastVersionId = NEWEST_SUPPORTED_RELEASE;
 		return TEMPLATE;
 	}
 
 	public static MinecraftProfile getDefaultProfile(){
 		MinecraftProfile defaultProfile = new MinecraftProfile();
 		defaultProfile.name = "Default";
-		defaultProfile.lastVersionId = LATEST_RELEASE;
+		defaultProfile.lastVersionId = NEWEST_SUPPORTED_RELEASE;
 		return defaultProfile;
 	}
 

@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -41,13 +42,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /// Sodium and other renderer replacements are left out, Amethyst does not support them.
 public class OptimizedProfileInstaller {
     private static final String TAG = "OptimizedProfile";
-    private static final String PREF_KEY_INSTALLED = "optimizedProfileInstalled";
+    // Bumped when the profile has to be rebuilt, the first one was on 26.3 which doesn't start
+    private static final String PREF_KEY_INSTALLED = "optimizedProfileInstalled_1.21";
+    // 26.x opens its window through SDL3 in a way Amethyst can't handle yet, so stick to 1.21.x
+    private static final String GAME_VERSION_PREFIX = "1.21";
     private static final String INSTANCE_PATH = "custom_instances/optimized";
     private static final String MODRINTH_VERSIONS_URL = "https://api.modrinth.com/v2/project/%s/version?loaders=%s&game_versions=%s";
     // Every one of these needs a build for the picked Minecraft version
     private static final String[] CORE_MODS = {"fabric-api", "appleskin", "shulkerboxtooltip", "lithium", "ferrite-core"};
     // Added when they have a build for the picked Minecraft version
-    private static final String[] EXTRA_MODS = {"modernfix", "entityculling", "modmenu"};
+    private static final String[] EXTRA_MODS = {"modernfix", "entityculling", "modmenu", "cloth-config"};
     // Shipped in earlier builds but broke the game (Dynamic FPS gave a black screen), deleted on launch
     private static final String[] REMOVED_MODS = {"dynamic-fps", "dynamic_fps", "dynamicfps"};
     // How many of the newest releases to try before giving up
@@ -99,6 +103,7 @@ public class OptimizedProfileInstaller {
         int candidates = 0;
         for (JMinecraftVersionList.Version version : versionList.versions) {
             if (!"release".equals(version.type) || !fabricSupported.contains(version.id)) continue;
+            if (!version.id.equals(GAME_VERSION_PREFIX) && !version.id.startsWith(GAME_VERSION_PREFIX + ".")) continue;
             if (candidates++ >= MAX_CANDIDATES) break;
             Map<String, JsonObject> mods = resolveMods(version.id);
             if (mods == null) continue;
@@ -200,6 +205,11 @@ public class OptimizedProfileInstaller {
         profile.lastVersionId = versionId;
         profile.gameDir = Tools.LAUNCHERPROFILES_RTPREFIX + INSTANCE_PATH;
         profile.icon = FabriclikeUtils.FABRIC_UTILS.getIconName();
+        // Replace the profile from an earlier setup, it points to the same folder
+        Iterator<MinecraftProfile> oldProfiles = LauncherProfiles.mainProfileJson.profiles.values().iterator();
+        while (oldProfiles.hasNext()) {
+            if (profile.gameDir.equals(oldProfiles.next().gameDir)) oldProfiles.remove();
+        }
         String profileKey = LauncherProfiles.getFreeProfileKey();
         LauncherProfiles.mainProfileJson.profiles.put(profileKey, profile);
         LauncherProfiles.write();
